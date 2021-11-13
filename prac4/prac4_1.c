@@ -15,7 +15,7 @@ int check(int c){
 }
 
 // процедура чтения слова 
-char *read_word(int *flag_quote, FILE *file_in){
+char *read_word(int *flag_quote, int *flag_n, FILE *file_in){
     char *str = NULL;
     int i = 0, length = 4;
     char c;
@@ -47,6 +47,10 @@ char *read_word(int *flag_quote, FILE *file_in){
 		c = getc(file_in);
     }
     
+    if (c == '\n'){
+        *flag_n = 1;
+    }
+
     if (c != '"'){
         ungetc(c, file_in);
     }
@@ -173,7 +177,7 @@ void free_arr(char **arr, int i){
 int main(int argc, char *argv[]){
     
     int i, flag_quote = 0, flag_i = 0, length = 8, flag_n = 0;
-    char *str, *str_n = "\n";
+    char *str;
     char **arr_str = (char **)malloc(length * sizeof(char*));
    
     // анализ командной строки -- чтение со стандартного ввода или из файла?
@@ -188,24 +192,24 @@ int main(int argc, char *argv[]){
     } 
     else file_in = stdin;
 
-    str = read_word(&flag_quote, file_in);
+    str = read_word(&flag_quote, &flag_n, file_in);
     while (str != NULL){
         i = 0;
 
-        while (strcmp(str, str_n)){
+        while (!flag_n){
             if (i == length - 1){
                 length *= 2;
                 arr_str = (char **)realloc(arr_str, length * sizeof(char*));
             }
             arr_str[i] = str;
             i++;
-            str = read_word(&flag_quote, file_in);
+            str = read_word(&flag_quote, &flag_n, file_in);
         }
         
         free(str);
         arr_str[i] = NULL;
 
-		str = read_word(&flag_quote, file_in);
+		str = read_word(&flag_quote, &flag_n, file_in);
     }
 
     print_arr(arr_str);

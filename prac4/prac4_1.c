@@ -177,8 +177,7 @@ void free_arr(char **arr, int i){
 int main(int argc, char *argv[]){
     
     int i, flag_quote = 0, flag_i = 0, length = 8, flag_n = 0;
-    char *str;
-    char **arr_str = (char **)malloc(length * sizeof(char*));
+    char *str, *str_n = "\n";
    
     // анализ командной строки -- чтение со стандартного ввода или из файла?
     for (int i = 1; i < argc; i++){
@@ -195,8 +194,9 @@ int main(int argc, char *argv[]){
     str = read_word(&flag_quote, &flag_n, file_in);
     while (str != NULL){
         i = 0;
+        char **arr_str = (char **)malloc(length * sizeof(char*));
 
-        while (!flag_n){
+        while (strcmp(str, str_n) && !flag_n){
             if (i == length - 1){
                 length *= 2;
                 arr_str = (char **)realloc(arr_str, length * sizeof(char*));
@@ -207,13 +207,13 @@ int main(int argc, char *argv[]){
         }
         
         free(str);
-        arr_str[i] = NULL;
+        arr_str[i++] = NULL;
+        print_arr(arr_str);
+        free_arr(arr_str, i);
 
 		str = read_word(&flag_quote, &flag_n, file_in);
     }
-
-    print_arr(arr_str);
-    free_arr(arr_str, i);
+    
     fclose(file_in);
 
     return 0;

@@ -158,8 +158,7 @@ char *read_quote(int *flag_quote, FILE *file_in){
     if (c == '\n'){
         free(str);
         printf("ERROR: open quotation mark \n");
-        exit(0);
-        //return NULL;
+        return NULL;
     }
     else return str;
 }
@@ -189,11 +188,8 @@ int main(int argc, char *argv[]){
 
     file_in = stdin;
     // анализ командной строки -- чтение со стандартного ввода или из файла?
-    if (argc > 0){
+    if (argc > 1){
         file_in = fopen(argv[1], "r");
-    }
-    else{
-        printf("File not open\n");
     }
     
     str = read_word(&flag_quote, file_in);
@@ -201,7 +197,7 @@ int main(int argc, char *argv[]){
         i = 0;
         char **arr_str = (char **)malloc(length * sizeof(char*));
 
-        while (strcmp(str, str_n) && (str != NULL)){
+        while ((str != NULL) && strcmp(str, str_n)){
             if (i == length - 1){
                 length *= 2;
                 arr_str = (char **)realloc(arr_str, length * sizeof(char*));
@@ -213,7 +209,9 @@ int main(int argc, char *argv[]){
 
         free(str);
         arr_str[i] = NULL;
-        print_arr(arr_str);
+        if (str != NULL){
+            print_arr(arr_str);
+        }
         free_arr(arr_str, i);
 
 		str = read_word(&flag_quote, file_in);

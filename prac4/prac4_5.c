@@ -10,20 +10,21 @@
 
 void zmbcheck();
 void chldhandler();
-int checkpid(int **arrpid, int *len, int pid);
+int checkpid(int **arr_pid, int *len, int pid);
 char *read_quote(int *flag_quote, FILE *file_in);
 char *read_symb(char c, FILE *file_in);
 
 struct cmd{                  
 	char **cmdarr;
 	int cmdcount;
-	struct cmd *cmdnext;	// 
+	struct cmd *cmdnext;
 	struct cmd *cmdnextseq;
 	char logicflag; 
 	int bgdflag;
 	char *infd;
 	char *outfd;
 	char *addfd;
+    struct cmd *cmdbracket;
 };
 
 //инициализиция нашей вспомогательной структуры 
@@ -32,10 +33,12 @@ void initcmd(struct cmd *shellstruct){
 	shellstruct->cmdcount = 0;
 	shellstruct->cmdnext = NULL;
 	shellstruct->cmdnextseq = NULL;
+	shellstruct->logicflag = 0;
 	shellstruct->bgdflag = 0;
 	shellstruct->infd = NULL;
 	shellstruct->outfd = NULL;
 	shellstruct->addfd = NULL;
+    shellstruct->cmdbracket = NULL;
 }
 
 // функция проверки на спец символ 
@@ -114,7 +117,7 @@ char *read_symb(char c, FILE *file_in){
             break;
         case '&':
             c = getc(file_in);
-            if(c == '&'){
+            if (c == '&'){
                 return help_read_symb(AND);
             }
             else{
@@ -124,7 +127,7 @@ char *read_symb(char c, FILE *file_in){
             break;
         case '|':
             c = getc(file_in);
-            if(c == '|'){
+            if (c == '|'){
                 return help_read_symb(OR);
             }
             else{
@@ -134,7 +137,7 @@ char *read_symb(char c, FILE *file_in){
             break;
         case '>': 
             c = getc(file_in);
-            if(c == '>'){
+            if (c == '>'){
                 return help_read_symb(APPEND);
             }
             else{
@@ -192,8 +195,8 @@ char *read_quote(int *flag_quote, FILE *file_in){
 enum flags symbolcheck (char * symbol){
 	enum flags i;
 
-	for(i = EMPTY + 1; i <= RBRACKET ; i++){
-		if(strcmp(symbol, signs[i]) == 0){
+	for (i = EMPTY + 1; i <= RBRACKET ; i++){
+		if (strcmp(symbol, signs[i]) == 0){
 			return i;
 		}
 	}
@@ -224,8 +227,8 @@ int lastpid, laststatus;
 
 int *addpid(int *pointer, int *length, int add){   
     int *result = pointer;
-    result = realloc (pointer, (1 + *length) * sizeof(int));
-    result [*length]= add;
+    result = realloc(pointer, (1 + *length) * sizeof(int));
+    result [*length] = add;
     (*length)++;
 	
     return result;
@@ -270,7 +273,7 @@ void zmbcheck(){
 			}
 		}
 	}
-	while(pid > 0);
+	while (pid > 0);
 }
 
 /*
@@ -280,19 +283,19 @@ checkpid - выполняет поиск заданного pid в массив�
 0, если pid не найден
 1, если найден и удален
 */
-int checkpid(int **arrpid, int *len, int pid){  
+int checkpid(int **arr_pid, int *len, int pid){  
 	int index = -1;
 	int j = *len, i;
-	for(i = 0; i < j; i++){
-		if((*arrpid)[i] == pid){
+	for (i = 0; i < j; i++){
+		if ((*arr_pid)[i] == pid){
 			index = i;
 			break;
 		}
 	}
 	if (index >= 0){
 		j--;
-		for(i = index; i < j; i++){
-			(*arrpid)[i] = (*arrpid)[i+1];
+		for (i = index; i < j; i++){
+			(*arr_pid)[i] = (*arr_pid)[i+1];
 		}
 		*len = j;
 		return 1;
@@ -338,7 +341,7 @@ struct cmd *cmd_analyse(char ***cmdarr){
 			case BACKGROUND:
 				(*cmdarr)++;
 				shellstruct->bgdflag = 1;
-				if(**cmdarr != NULL){
+				if (**cmdarr != NULL){
 					printf("Don't have commands to execute\n");
 					return first;
 				}
@@ -367,7 +370,6 @@ struct cmd *cmd_analyse(char ***cmdarr){
 				first->cmdnextseq = cmd_analyse(cmdarr);
 				return first;
 				break;
-			
 			default:
 				break;    
 		}
@@ -384,62 +386,66 @@ int cmd_execute(struct cmd *shellstruct){
 	while (shellstruct != NULL)	{
 		int save0 = dup(0);
 		int save1 = dup(1);         
-		if(shellstruct->cmdarr != NULL && strcmp(shellstruct->cmdarr[0], "cd") == 0){
+		if (shellstruct->cmdarr != NULL && strcmp(shellstruct->cmdarr[0], "cd") == 0){
 			int rez;
-			if(shellstruct->cmdarr[1] == NULL){
-				if(chdir(getenv("HOME")) == -1){
+			if (shellstruct->cmdarr[1] == NULL){
+				if (chdir(getenv("HOME")) == -1){
 					printf("Error: you are homeless\n");
 					exit(1);
 				}
 			}
 			else{
 				rez = chdir(shellstruct->cmdarr[1]);
-				if(rez == -1){
+				if (rez == -1){
 					perror(shellstruct->cmdarr[1]);
+                    exit(1);
 				}
 			}
 		}
-		else if(shellstruct->cmdarr != NULL && strcmp(shellstruct->cmdarr[0], "exit") == 0){
+		else if (shellstruct->cmdarr != NULL && strcmp(shellstruct->cmdarr[0], "exit") == 0){
 			exit(0);
 		}
 		else{
-			if(i != 0){
+			if (i != 0){
 				dup2(fd[0],0);
 				close(fd[0]);
 			}
-			if(shellstruct->cmdnext != NULL){
+			if (shellstruct->cmdnext != NULL){
 				pipe(fd);
 				dup2(fd[1],1);
 				close(fd[1]);
 			}
 			int pid = fork();
-			if(pid == 0){
-				if(shellstruct->cmdnext != NULL){
+			if (pid == 0){
+				if (shellstruct->cmdnext != NULL){
 					close(fd[0]);
 				}
 				signal(SIGINT, SIG_DFL);
-				if(shellstruct->bgdflag != 0){
+				if (shellstruct->bgdflag != 0){
 					file = open ("/dev/null", O_RDONLY);
-					if(file == -1){
+					if (file == -1){
 						perror(shellstruct->infd);
+                        exit(1);
 					}
 					dup2 (file,0);
 					close (file);
 				}
 				else{
-					if(shellstruct->infd != NULL){
+					if (shellstruct->infd != NULL){
 						file = open(shellstruct->infd, O_RDONLY);
-						if(file == -1){
+						if (file == -1){
 							perror(shellstruct->infd);
+                            exit(1);
 						}
 						dup2 (file,0);
 						close (file);
 					}
 				}
-				if(shellstruct->outfd != NULL){
+				if (shellstruct->outfd != NULL){
 					file = open(shellstruct->outfd, O_CREAT | O_WRONLY | O_TRUNC, 0666);
 					if (file == -1){
 						perror(shellstruct->outfd);
+                        exit(1);
 					}
 					dup2 (file,1);
 					close (file);
@@ -449,19 +455,21 @@ int cmd_execute(struct cmd *shellstruct){
 						file = open (shellstruct->addfd, O_APPEND | O_WRONLY);
 						if (file == -1){
 							perror(shellstruct->addfd);
+                            exit(1);
 						}
 						dup2 (file,1);
 						close (file);
 					}
 				}
-
-                signal(SIGCHLD, SIG_DFL);
-                execvp(shellstruct->cmdarr[0],shellstruct->cmdarr);
-                perror(shellstruct->cmdarr[0]);
-                exit(1);
+				if (shellstruct->cmdarr != NULL){
+					signal(SIGCHLD, SIG_DFL);
+					execvp(shellstruct->cmdarr[0],shellstruct->cmdarr);
+					perror(shellstruct->cmdarr[0]);
+					exit(1);
+				}
 			}
 			else{
-				if(shellstruct->bgdflag){
+				if (shellstruct->bgdflag){
 					printf("child pid: [%d]\n", pid);
 					bgdpids = addpid(bgdpids, &bgdlen, pid);
 				}
@@ -469,12 +477,9 @@ int cmd_execute(struct cmd *shellstruct){
 					fgdpids = addpid(fgdpids, &fgdlen, pid);
 				}
 			}
-			if(shellstruct->cmdnext == NULL){
-				lastpid = pid;
-			}
-			else if(pid < 0){
-				printf ("Error\n");
-			}
+            if (shellstruct->cmdnext == NULL){
+                lastpid = pid;
+            }
 		}
 
 		shellstruct = shellstruct->cmdnext;
@@ -484,23 +489,25 @@ int cmd_execute(struct cmd *shellstruct){
 		close(save0);
 		close(save1);
 	}
-	
+
+    while (fgdlen != 0);
+
 	int okay = WIFEXITED(laststatus) && WEXITSTATUS(laststatus) == 0;
 	if (first->logicflag == '|'){
-		if(okay != 0){
-			while(first->logicflag == '|'){
+		if (okay != 0){
+			while (first->logicflag == '|'){
 				first = first->cmdnextseq;
-				if(first->cmdnextseq == NULL){
+				if (first->cmdnextseq == NULL){
 					break;
 				}
 			}
 		}
 	}
 	else if (first->logicflag == '&'){
-		if(okay == 0){
-			while(first->logicflag == '&'){
+		if (okay == 0){
+			while (first->logicflag == '&'){
 				first = first->cmdnextseq;
-				if(first->cmdnextseq == NULL){
+				if (first->cmdnextseq == NULL){
 					break;
 				}
 			}
@@ -508,7 +515,7 @@ int cmd_execute(struct cmd *shellstruct){
 	}
 
 	status = laststatus;
-	if(first->cmdnextseq){
+	if (first->cmdnextseq){
 		status = cmd_execute(first->cmdnextseq);  
 	}
 
@@ -522,7 +529,7 @@ void free_arr(char **arr, int i){
 
 void free_cmd(struct cmd *shellstruct){
 	struct cmd *temp;
-	while(shellstruct != NULL){
+	while (shellstruct != NULL){
 		free(shellstruct->infd);
 		free(shellstruct->outfd);
 		free(shellstruct->addfd);
@@ -541,13 +548,11 @@ int main(int argc, char *argv[]){
 	struct cmd *cmdpointer;
 
     file_in = stdin;
-    // анализ командной строки -- чтение со стандартного ввода или из файла?
     if (argc > 1){
         file_in = fopen(argv[1], "r");
     }
 
     signal (SIGCHLD, chldhandler);
-    printf("> ");
     str = read_word(&flag_quote, file_in);
     
     while (str != NULL){
@@ -569,11 +574,12 @@ int main(int argc, char *argv[]){
 
         cmdpointer = cmd_analyse(&tmparr);
         
-        cmd_execute(cmdpointer);
-
+        if (cmdpointer && cmdpointer->cmdarr){
+			cmd_execute(cmdpointer);
+		}
+        
         free_cmd(cmdpointer);
 		free_arr(arr_str,i);
-        printf("> ");
         str = read_word(&flag_quote, file_in);
     }
 
